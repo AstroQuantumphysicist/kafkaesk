@@ -1,0 +1,715 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Kafkaesk — Single‑File Deck</title>
+<style>
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+:root{
+  --bg-1: radial-gradient(1200px 800px at 10% 10%, #1e293b 0%, #0b1220 70%);
+  --bg-2: radial-gradient(1200px 800px at 90% 20%, #0f172a 0%, #020617 70%);
+  --fg: #e6edf3;
+  --muted: #9fb0c0;
+  --accent: #7dd3fc;
+  --accent-2: #a78bfa;
+  --card-bg: rgba(255,255,255,0.06);
+  --card-bd: rgba(255,255,255,0.12);
+  --shadow: 0 10px 40px rgba(0,0,0,0.35);
+  --radius: 20px;
+  --transition: 280ms cubic-bezier(.2,.7,.2,1);
+  --scale: clamp(1.0, 1vw + 0.8, 1.35);
+}
+body{
+  font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+  color:var(--fg);
+  background:
+    radial-gradient(60vw 60vh at 15% 15%, rgba(125,211,252,0.12) 0%, rgba(125,211,252,0) 60%),
+    radial-gradient(50vw 50vh at 85% 25%, rgba(167,139,250,0.10) 0%, rgba(167,139,250,0) 60%),
+    linear-gradient(180deg, #0b1220, #070b13 60%, #04060a);
+  overflow:hidden;
+}
+.deck{position:relative;width:100%;height:100%;}
+.slide{
+  position:absolute; inset:0;
+  display:flex; align-items:center; justify-content:center;
+  padding:8vh 8vw;
+  opacity:0; transform:translateX(60px) scale(0.98);
+  transition: opacity var(--transition), transform var(--transition), filter var(--transition);
+  filter: blur(2px);
+}
+.slide.active{opacity:1; transform:translateX(0) scale(1); filter: blur(0)}
+.slide .card{
+  max-width:min(1200px, 90vw);
+  width: min(1200px, 90vw);
+  background: linear-gradient(180deg, rgba(255,255,255,0.08), rgba(255,255,255,0.04));
+  border:1px solid var(--card-bd);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: clamp(32px, 6vmin, 72px);
+  backdrop-filter: saturate(140%) blur(10px);
+}
+h1{ 
+  margin:0 0 .2em 0;
+  font-size: clamp(38px, 7.2vmin, 96px);
+  letter-spacing: -0.02em;
+  line-height:1.06;
+}
+p.tagline{
+  margin:.2em 0 0 0;
+  font-size: clamp(18px, 2.3vmin, 28px);
+  color:var(--muted);
+}
+.minimal h1{font-weight:800}
+.minimal .sub{ font-size: clamp(18px, 2vmin, 24px); opacity:.85 }
+.slide::before{
+  content:""; position:absolute; inset:-10%;
+  background: conic-gradient(from 180deg at 50% 50%, rgba(125,211,252,0.10), rgba(167,139,250,0.10), rgba(125,211,252,0.10));
+  filter: blur(60px);
+  z-index:-1; opacity:.9;
+}
+.slide[data-variant="b"]::before{ background: conic-gradient(from -90deg at 50% 50%, rgba(94,234,212,0.12), rgba(147,197,253,0.12), rgba(94,234,212,0.12))}
+.slide[data-variant="c"]::before{ background: conic-gradient(from 90deg at 50% 50%, rgba(244,114,182,0.10), rgba(167,139,250,0.12), rgba(244,114,182,0.10))}
+.slide[data-variant="d"]::before{ background: conic-gradient(from 0deg at 50% 50%, rgba(250,204,21,0.08), rgba(56,189,248,0.12), rgba(250,204,21,0.08))}
+.progress{position:absolute;left:0;right:0;bottom:0;height:6px;background:rgba(255,255,255,0.08)}
+.progress .bar{height:100%;width:0;background:linear-gradient(90deg, #7dd3fc, #a78bfa)}
+.counter{position:absolute;right:14px;bottom:10px;font-size:12px;color:#c7d2fe;letter-spacing:.1em;opacity:.8}
+.controls{ position:absolute; right:20px; top:20px; display:flex; gap:8px; z-index:5; }
+.controls button{
+  border:1px solid var(--card-bd);
+  background:var(--card-bg); color:var(--fg);
+  padding:10px 12px; border-radius:12px;
+  cursor:pointer; backdrop-filter: blur(8px);
+  transition: transform var(--transition), background var(--transition);
+}
+.controls button:hover{ transform: translateY(-1px); background: rgba(255,255,255,0.10)}
+.badge{position:absolute;left:20px;top:20px;font-size:12px;color:#93c5fd;opacity:.85;letter-spacing:.12em;text-transform:uppercase}
+.help{ position:absolute; inset:auto 20px 60px auto; right:20px; max-width:420px;
+  padding:14px 16px; border-radius:14px;
+  border:1px solid var(--card-bd); background:var(--card-bg);
+  color:var(--muted); font-size:14px; line-height:1.4; display:none; }
+.help.show{display:block}
+.overview{position:absolute; inset:0; padding:4vh 4vw; display:none; grid-template-columns: repeat(auto-fill, minmax(260px,1fr)); gap:14px; overflow:auto;}
+.overview.show{display:grid}
+.thumb{ border:1px solid var(--card-bd); background:var(--card-bg); border-radius:14px; padding:16px; cursor:pointer;
+  transition:transform var(--transition), background var(--transition); }
+.thumb:hover{transform:translateY(-2px); background:rgba(255,255,255,0.08)}
+.thumb h3{margin:0;font-size:18px}
+@media print{
+  .controls,.help,.progress,.counter,.badge,.overview{display:none !important}
+  .slide{position:static; page-break-after:always; opacity:1!important; transform:none!important; filter:none!important}
+  body{overflow:visible}
+}
+</style>
+</head>
+<body>
+<div class="deck" id="deck">
+  <div class="badge">Single‑File Deck • Pfeiltasten</div>
+  <div class="controls">
+    <button id="prev" title="Vorherige Folie (←)">←</button>
+    <button id="next" title="Nächste Folie (→)">→</button>
+    <button id="grid" title="Übersicht (O)">☰</button>
+    <button id="helpBtn" title="Hilfe (H)">?</button>
+  </div>
+  <div class="help" id="help">
+    <strong>Steuerung</strong><br>
+    ←/→ oder Leertaste: Navigation · O: Übersicht · H: Hilfe · P: Vollbild · S: Folie als PNG (Experiment) · #N für direkte Sprünge.<br>
+    Tipp: Drucken → „Als PDF sichern“ erzeugt ein Handout.
+  </div>
+  <div class="slides">
+
+    <section class="slide minimal" data-variant="{{"abcd"[0%4]}}" data-index="0">
+      <div class="card">
+        <h1>KAFKAESK</h1>
+        <p class="tagline">Kafkaesk • Folie 1/61</p>
+      </div>
+    </section>
+
+    <section class="slide minimal" data-variant="{{"abcd"[1%4]}}" data-index="1">
+      <div class="card">
+        <h1>Eine Minimal‑Landkarte</h1>
+        <p class="tagline">Kafkaesk • Folie 2/61</p>
+      </div>
+    </section>
+
+    <section class="slide minimal" data-variant="{{"abcd"[2%4]}}" data-index="2">
+      <div class="card">
+        <h1>Was heißt „kafkaesk“?</h1>
+        <p class="tagline">Kafkaesk • Folie 3/61</p>
+      </div>
+    </section>
+
+    <section class="slide minimal" data-variant="{{"abcd"[3%4]}}" data-index="3">
+      <div class="card">
+        <h1>Atmosphäre statt Genre</h1>
+        <p class="tagline">Kafkaesk • Folie 4/61</p>
+      </div>
+    </section>
+
+    <section class="slide minimal" data-variant="{{"abcd"[4%4]}}" data-index="4">
+      <div class="card">
+        <h1>Sachlich erzählt, existenziell hart</h1>
+        <p class="tagline">Kafkaesk • Folie 5/61</p>
+      </div>
+    </section>
+
+    <section class="slide minimal" data-variant="{{"abcd"[5%4]}}" data-index="5">
+      <div class="card">
+        <h1>Regeln ohne Erklärung</h1>
+        <p class="tagline">Kafkaesk • Folie 6/61</p>
+      </div>
+    </section>
+
+    <section class="slide minimal" data-variant="{{"abcd"[6%4]}}" data-index="6">
+      <div class="card">
+        <h1>Form schlägt Inhalt</h1>
+        <p class="tagline">Kafkaesk • Folie 7/61</p>
+      </div>
+    </section>
+
+    <section class="slide minimal" data-variant="{{"abcd"[7%4]}}" data-index="7">
+      <div class="card">
+        <h1>Verfahren statt Gründe</h1>
+        <p class="tagline">Kafkaesk • Folie 8/61</p>
+      </div>
+    </section>
+
+    <section class="slide minimal" data-variant="{{"abcd"[8%4]}}" data-index="8">
+      <div class="card">
+        <h1>Nähe ohne Zugang</h1>
+        <p class="tagline">Kafkaesk • Folie 9/61</p>
+      </div>
+    </section>
+
+    <section class="slide minimal" data-variant="{{"abcd"[9%4]}}" data-index="9">
+      <div class="card">
+        <h1>Schuld ohne Tatbestand</h1>
+        <p class="tagline">Kafkaesk • Folie 10/61</p>
+      </div>
+    </section>
+
+    <section class="slide minimal" data-variant="{{"abcd"[10%4]}}" data-index="10">
+      <div class="card">
+        <h1>Bürokratische Labyrinthe</h1>
+        <p class="tagline">Kafkaesk • Folie 11/61</p>
+      </div>
+    </section>
+
+    <section class="slide minimal" data-variant="{{"abcd"[11%4]}}" data-index="11">
+      <div class="card">
+        <h1>Intransparenz</h1>
+        <p class="tagline">Kafkaesk • Folie 12/61</p>
+      </div>
+    </section>
+
+    <section class="slide minimal" data-variant="{{"abcd"[12%4]}}" data-index="12">
+      <div class="card">
+        <h1>Proportionsbruch</h1>
+        <p class="tagline">Kafkaesk • Folie 13/61</p>
+      </div>
+    </section>
+
+    <section class="slide minimal" data-variant="{{"abcd"[13%4]}}" data-index="13">
+      <div class="card">
+        <h1>Passiv & Indefinitheit</h1>
+        <p class="tagline">Kafkaesk • Folie 14/61</p>
+      </div>
+    </section>
+
+    <section class="slide minimal" data-variant="{{"abcd"[14%4]}}" data-index="14">
+      <div class="card">
+        <h1>Modalverben: sollen, müssen, können</h1>
+        <p class="tagline">Kafkaesk • Folie 15/61</p>
+      </div>
+    </section>
+
+    <section class="slide minimal" data-variant="{{"abcd"[15%4]}}" data-index="15">
+      <div class="card">
+        <h1>Pedantische Details, leere Begründung</h1>
+        <p class="tagline">Kafkaesk • Folie 16/61</p>
+      </div>
+    </section>
+
+    <section class="slide minimal" data-variant="{{"abcd"[16%4]}}" data-index="16">
+      <div class="card">
+        <h1>Kühle Sprache, heißes Problem</h1>
+        <p class="tagline">Kafkaesk • Folie 17/61</p>
+      </div>
+    </section>
+
+    <section class="slide minimal" data-variant="{{"abcd"[17%4]}}" data-index="17">
+      <div class="card">
+        <h1>Selbstverstrickung der Figur</h1>
+        <p class="tagline">Kafkaesk • Folie 18/61</p>
+      </div>
+    </section>
+
+    <section class="slide minimal" data-variant="{{"abcd"[18%4]}}" data-index="18">
+      <div class="card">
+        <h1>Ewiges Jetzt der Abwicklung</h1>
+        <p class="tagline">Kafkaesk • Folie 19/61</p>
+      </div>
+    </section>
+
+    <section class="slide minimal" data-variant="{{"abcd"[19%4]}}" data-index="19">
+      <div class="card">
+        <h1>Topologie der Verweigerung</h1>
+        <p class="tagline">Kafkaesk • Folie 20/61</p>
+      </div>
+    </section>
+
+    <section class="slide minimal" data-variant="{{"abcd"[20%4]}}" data-index="20">
+      <div class="card">
+        <h1>Interne Fokalisierung, wenig Psychologie</h1>
+        <p class="tagline">Kafkaesk • Folie 21/61</p>
+      </div>
+    </section>
+
+    <section class="slide minimal" data-variant="{{"abcd"[21%4]}}" data-index="21">
+      <div class="card">
+        <h1>Parataxe statt Pathos</h1>
+        <p class="tagline">Kafkaesk • Folie 22/61</p>
+      </div>
+    </section>
+
+    <section class="slide minimal" data-variant="{{"abcd"[22%4]}}" data-index="22">
+      <div class="card">
+        <h1>Vage‑Exaktheit</h1>
+        <p class="tagline">Kafkaesk • Folie 23/61</p>
+      </div>
+    </section>
+
+    <section class="slide minimal" data-variant="{{"abcd"[23%4]}}" data-index="23">
+      <div class="card">
+        <h1>Institutionen als Figuren</h1>
+        <p class="tagline">Kafkaesk • Folie 24/61</p>
+      </div>
+    </section>
+
+    <section class="slide minimal" data-variant="{{"abcd"[24%4]}}" data-index="24">
+      <div class="card">
+        <h1>Objekte mit Macht</h1>
+        <p class="tagline">Kafkaesk • Folie 25/61</p>
+      </div>
+    </section>
+
+    <section class="slide minimal" data-variant="{{"abcd"[25%4]}}" data-index="25">
+      <div class="card">
+        <h1>Treppen. Vorzimmer. Dachböden.</h1>
+        <p class="tagline">Kafkaesk • Folie 26/61</p>
+      </div>
+    </section>
+
+    <section class="slide minimal" data-variant="{{"abcd"[26%4]}}" data-index="26">
+      <div class="card">
+        <h1>Listen. Stempel. Akten.</h1>
+        <p class="tagline">Kafkaesk • Folie 27/61</p>
+      </div>
+    </section>
+
+    <section class="slide minimal" data-variant="{{"abcd"[27%4]}}" data-index="27">
+      <div class="card">
+        <h1>Korridor‑Dramaturgie</h1>
+        <p class="tagline">Kafkaesk • Folie 28/61</p>
+      </div>
+    </section>
+
+    <section class="slide minimal" data-variant="{{"abcd"[28%4]}}" data-index="28">
+      <div class="card">
+        <h1>Fristen fressen Lebenszeit</h1>
+        <p class="tagline">Kafkaesk • Folie 29/61</p>
+      </div>
+    </section>
+
+    <section class="slide minimal" data-variant="{{"abcd"[29%4]}}" data-index="29">
+      <div class="card">
+        <h1>Kleine Anlässe, große Folgen</h1>
+        <p class="tagline">Kafkaesk • Folie 30/61</p>
+      </div>
+    </section>
+
+    <section class="slide minimal" data-variant="{{"abcd"[30%4]}}" data-index="30">
+      <div class="card">
+        <h1>Gesetz ohne Sinn</h1>
+        <p class="tagline">Kafkaesk • Folie 31/61</p>
+      </div>
+    </section>
+
+    <section class="slide minimal" data-variant="{{"abcd"[31%4]}}" data-index="31">
+      <div class="card">
+        <h1>Schuld als Default</h1>
+        <p class="tagline">Kafkaesk • Folie 32/61</p>
+      </div>
+    </section>
+
+    <section class="slide minimal" data-variant="{{"abcd"[32%4]}}" data-index="32">
+      <div class="card">
+        <h1>Zirkuläre Autorität</h1>
+        <p class="tagline">Kafkaesk • Folie 33/61</p>
+      </div>
+    </section>
+
+    <section class="slide minimal" data-variant="{{"abcd"[33%4]}}" data-index="33">
+      <div class="card">
+        <h1>Weber: stahlharte Bürokratie</h1>
+        <p class="tagline">Kafkaesk • Folie 34/61</p>
+      </div>
+    </section>
+
+    <section class="slide minimal" data-variant="{{"abcd"[34%4]}}" data-index="34">
+      <div class="card">
+        <h1>Existenz ohne Offenbarung</h1>
+        <p class="tagline">Kafkaesk • Folie 35/61</p>
+      </div>
+    </section>
+
+    <section class="slide minimal" data-variant="{{"abcd"[35%4]}}" data-index="35">
+      <div class="card">
+        <h1>Humor: trocken, bitter</h1>
+        <p class="tagline">Kafkaesk • Folie 36/61</p>
+      </div>
+    </section>
+
+    <section class="slide minimal" data-variant="{{"abcd"[36%4]}}" data-index="36">
+      <div class="card">
+        <h1>Nicht einfach ‚bürokratisch‘</h1>
+        <p class="tagline">Kafkaesk • Folie 37/61</p>
+      </div>
+    </section>
+
+    <section class="slide minimal" data-variant="{{"abcd"[37%4]}}" data-index="37">
+      <div class="card">
+        <h1>Nicht einfach ‚absurd‘</h1>
+        <p class="tagline">Kafkaesk • Folie 38/61</p>
+      </div>
+    </section>
+
+    <section class="slide minimal" data-variant="{{"abcd"[38%4]}}" data-index="38">
+      <div class="card">
+        <h1>Nicht ‚orwellianisch‘</h1>
+        <p class="tagline">Kafkaesk • Folie 39/61</p>
+      </div>
+    </section>
+
+    <section class="slide minimal" data-variant="{{"abcd"[39%4]}}" data-index="39">
+      <div class="card">
+        <h1>Nicht rein grotesk</h1>
+        <p class="tagline">Kafkaesk • Folie 40/61</p>
+      </div>
+    </section>
+
+    <section class="slide minimal" data-variant="{{"abcd"[40%4]}}" data-index="40">
+      <div class="card">
+        <h1>Check 1: Verfahren & Barrieren</h1>
+        <p class="tagline">Kafkaesk • Folie 41/61</p>
+      </div>
+    </section>
+
+    <section class="slide minimal" data-variant="{{"abcd"[41%4]}}" data-index="41">
+      <div class="card">
+        <h1>Check 2: Regeln ohne Gründe</h1>
+        <p class="tagline">Kafkaesk • Folie 42/61</p>
+      </div>
+    </section>
+
+    <section class="slide minimal" data-variant="{{"abcd"[42%4]}}" data-index="42">
+      <div class="card">
+        <h1>Check 3: Schuld ohne Tat</h1>
+        <p class="tagline">Kafkaesk • Folie 43/61</p>
+      </div>
+    </section>
+
+    <section class="slide minimal" data-variant="{{"abcd"[43%4]}}" data-index="43">
+      <div class="card">
+        <h1>Check 4: Sachstil trotz Drama</h1>
+        <p class="tagline">Kafkaesk • Folie 44/61</p>
+      </div>
+    </section>
+
+    <section class="slide minimal" data-variant="{{"abcd"[44%4]}}" data-index="44">
+      <div class="card">
+        <h1>Check 5: Proportionsbruch</h1>
+        <p class="tagline">Kafkaesk • Folie 45/61</p>
+      </div>
+    </section>
+
+    <section class="slide minimal" data-variant="{{"abcd"[45%4]}}" data-index="45">
+      <div class="card">
+        <h1>Nähe zum Zentrum, kein Zugang</h1>
+        <p class="tagline">Kafkaesk • Folie 46/61</p>
+      </div>
+    </section>
+
+    <section class="slide minimal" data-variant="{{"abcd"[46%4]}}" data-index="46">
+      <div class="card">
+        <h1>Transit‑Orte als Bühne</h1>
+        <p class="tagline">Kafkaesk • Folie 47/61</p>
+      </div>
+    </section>
+
+    <section class="slide minimal" data-variant="{{"abcd"[47%4]}}" data-index="47">
+      <div class="card">
+        <h1>Objektpoetik</h1>
+        <p class="tagline">Kafkaesk • Folie 48/61</p>
+      </div>
+    </section>
+
+    <section class="slide minimal" data-variant="{{"abcd"[48%4]}}" data-index="48">
+      <div class="card">
+        <h1>Menschen als Anhänge</h1>
+        <p class="tagline">Kafkaesk • Folie 49/61</p>
+      </div>
+    </section>
+
+    <section class="slide minimal" data-variant="{{"abcd"[49%4]}}" data-index="49">
+      <div class="card">
+        <h1>Passiv löscht Agenten</h1>
+        <p class="tagline">Kafkaesk • Folie 50/61</p>
+      </div>
+    </section>
+
+    <section class="slide minimal" data-variant="{{"abcd"[50%4]}}" data-index="50">
+      <div class="card">
+        <h1>Indefinite: jemand, man, wer</h1>
+        <p class="tagline">Kafkaesk • Folie 51/61</p>
+      </div>
+    </section>
+
+    <section class="slide minimal" data-variant="{{"abcd"[51%4]}}" data-index="51">
+      <div class="card">
+        <h1>Modalität erzeugt Schwebe</h1>
+        <p class="tagline">Kafkaesk • Folie 52/61</p>
+      </div>
+    </section>
+
+    <section class="slide minimal" data-variant="{{"abcd"[52%4]}}" data-index="52">
+      <div class="card">
+        <h1>Negation als Stil</h1>
+        <p class="tagline">Kafkaesk • Folie 53/61</p>
+      </div>
+    </section>
+
+    <section class="slide minimal" data-variant="{{"abcd"[53%4]}}" data-index="53">
+      <div class="card">
+        <h1>Support‑Hölle</h1>
+        <p class="tagline">Kafkaesk • Folie 54/61</p>
+      </div>
+    </section>
+
+    <section class="slide minimal" data-variant="{{"abcd"[54%4]}}" data-index="54">
+      <div class="card">
+        <h1>Ticket‑Schleifen</h1>
+        <p class="tagline">Kafkaesk • Folie 55/61</p>
+      </div>
+    </section>
+
+    <section class="slide minimal" data-variant="{{"abcd"[55%4]}}" data-index="55">
+      <div class="card">
+        <h1>Algorithmische Türen</h1>
+        <p class="tagline">Kafkaesk • Folie 56/61</p>
+      </div>
+    </section>
+
+    <section class="slide minimal" data-variant="{{"abcd"[56%4]}}" data-index="56">
+      <div class="card">
+        <h1>Kooperate Ohnmacht</h1>
+        <p class="tagline">Kafkaesk • Folie 57/61</p>
+      </div>
+    </section>
+
+    <section class="slide minimal" data-variant="{{"abcd"[57%4]}}" data-index="57">
+      <div class="card">
+        <h1>Intransparenz + Schuld + Prozedur</h1>
+        <p class="tagline">Kafkaesk • Folie 58/61</p>
+      </div>
+    </section>
+
+    <section class="slide minimal" data-variant="{{"abcd"[58%4]}}" data-index="58">
+      <div class="card">
+        <h1>Sachstil + Proportionsbruch</h1>
+        <p class="tagline">Kafkaesk • Folie 59/61</p>
+      </div>
+    </section>
+
+    <section class="slide minimal" data-variant="{{"abcd"[59%4]}}" data-index="59">
+      <div class="card">
+        <h1>Das ist kafkaesk.</h1>
+        <p class="tagline">Kafkaesk • Folie 60/61</p>
+      </div>
+    </section>
+
+    <section class="slide minimal" data-variant="{{"abcd"[60%4]}}" data-index="60">
+      <div class="card">
+        <h1>Danke!</h1>
+        <p class="tagline">Kafkaesk • Folie 61/61</p>
+      </div>
+    </section>
+  </div>
+  <div class="progress"><div class="bar" id="bar"></div></div>
+  <div class="counter" id="counter">1/61</div>
+  <div class="overview" id="overview">
+    <div class="thumb" data-go="0"><h3>01. KAFKAESK</h3></div>
+<div class="thumb" data-go="1"><h3>02. Eine Minimal‑Landkarte</h3></div>
+<div class="thumb" data-go="2"><h3>03. Was heißt „kafkaesk“?</h3></div>
+<div class="thumb" data-go="3"><h3>04. Atmosphäre statt Genre</h3></div>
+<div class="thumb" data-go="4"><h3>05. Sachlich erzählt, existenziell hart</h3></div>
+<div class="thumb" data-go="5"><h3>06. Regeln ohne Erklärung</h3></div>
+<div class="thumb" data-go="6"><h3>07. Form schlägt Inhalt</h3></div>
+<div class="thumb" data-go="7"><h3>08. Verfahren statt Gründe</h3></div>
+<div class="thumb" data-go="8"><h3>09. Nähe ohne Zugang</h3></div>
+<div class="thumb" data-go="9"><h3>10. Schuld ohne Tatbestand</h3></div>
+<div class="thumb" data-go="10"><h3>11. Bürokratische Labyrinthe</h3></div>
+<div class="thumb" data-go="11"><h3>12. Intransparenz</h3></div>
+<div class="thumb" data-go="12"><h3>13. Proportionsbruch</h3></div>
+<div class="thumb" data-go="13"><h3>14. Passiv & Indefinitheit</h3></div>
+<div class="thumb" data-go="14"><h3>15. Modalverben: sollen, müssen, können</h3></div>
+<div class="thumb" data-go="15"><h3>16. Pedantische Details, leere Begründung</h3></div>
+<div class="thumb" data-go="16"><h3>17. Kühle Sprache, heißes Problem</h3></div>
+<div class="thumb" data-go="17"><h3>18. Selbstverstrickung der Figur</h3></div>
+<div class="thumb" data-go="18"><h3>19. Ewiges Jetzt der Abwicklung</h3></div>
+<div class="thumb" data-go="19"><h3>20. Topologie der Verweigerung</h3></div>
+<div class="thumb" data-go="20"><h3>21. Interne Fokalisierung, wenig Psychologie</h3></div>
+<div class="thumb" data-go="21"><h3>22. Parataxe statt Pathos</h3></div>
+<div class="thumb" data-go="22"><h3>23. Vage‑Exaktheit</h3></div>
+<div class="thumb" data-go="23"><h3>24. Institutionen als Figuren</h3></div>
+<div class="thumb" data-go="24"><h3>25. Objekte mit Macht</h3></div>
+<div class="thumb" data-go="25"><h3>26. Treppen. Vorzimmer. Dachböden.</h3></div>
+<div class="thumb" data-go="26"><h3>27. Listen. Stempel. Akten.</h3></div>
+<div class="thumb" data-go="27"><h3>28. Korridor‑Dramaturgie</h3></div>
+<div class="thumb" data-go="28"><h3>29. Fristen fressen Lebenszeit</h3></div>
+<div class="thumb" data-go="29"><h3>30. Kleine Anlässe, große Folgen</h3></div>
+<div class="thumb" data-go="30"><h3>31. Gesetz ohne Sinn</h3></div>
+<div class="thumb" data-go="31"><h3>32. Schuld als Default</h3></div>
+<div class="thumb" data-go="32"><h3>33. Zirkuläre Autorität</h3></div>
+<div class="thumb" data-go="33"><h3>34. Weber: stahlharte Bürokratie</h3></div>
+<div class="thumb" data-go="34"><h3>35. Existenz ohne Offenbarung</h3></div>
+<div class="thumb" data-go="35"><h3>36. Humor: trocken, bitter</h3></div>
+<div class="thumb" data-go="36"><h3>37. Nicht einfach ‚bürokratisch‘</h3></div>
+<div class="thumb" data-go="37"><h3>38. Nicht einfach ‚absurd‘</h3></div>
+<div class="thumb" data-go="38"><h3>39. Nicht ‚orwellianisch‘</h3></div>
+<div class="thumb" data-go="39"><h3>40. Nicht rein grotesk</h3></div>
+<div class="thumb" data-go="40"><h3>41. Check 1: Verfahren & Barrieren</h3></div>
+<div class="thumb" data-go="41"><h3>42. Check 2: Regeln ohne Gründe</h3></div>
+<div class="thumb" data-go="42"><h3>43. Check 3: Schuld ohne Tat</h3></div>
+<div class="thumb" data-go="43"><h3>44. Check 4: Sachstil trotz Drama</h3></div>
+<div class="thumb" data-go="44"><h3>45. Check 5: Proportionsbruch</h3></div>
+<div class="thumb" data-go="45"><h3>46. Nähe zum Zentrum, kein Zugang</h3></div>
+<div class="thumb" data-go="46"><h3>47. Transit‑Orte als Bühne</h3></div>
+<div class="thumb" data-go="47"><h3>48. Objektpoetik</h3></div>
+<div class="thumb" data-go="48"><h3>49. Menschen als Anhänge</h3></div>
+<div class="thumb" data-go="49"><h3>50. Passiv löscht Agenten</h3></div>
+<div class="thumb" data-go="50"><h3>51. Indefinite: jemand, man, wer</h3></div>
+<div class="thumb" data-go="51"><h3>52. Modalität erzeugt Schwebe</h3></div>
+<div class="thumb" data-go="52"><h3>53. Negation als Stil</h3></div>
+<div class="thumb" data-go="53"><h3>54. Support‑Hölle</h3></div>
+<div class="thumb" data-go="54"><h3>55. Ticket‑Schleifen</h3></div>
+<div class="thumb" data-go="55"><h3>56. Algorithmische Türen</h3></div>
+<div class="thumb" data-go="56"><h3>57. Kooperate Ohnmacht</h3></div>
+<div class="thumb" data-go="57"><h3>58. Intransparenz + Schuld + Prozedur</h3></div>
+<div class="thumb" data-go="58"><h3>59. Sachstil + Proportionsbruch</h3></div>
+<div class="thumb" data-go="59"><h3>60. Das ist kafkaesk.</h3></div>
+<div class="thumb" data-go="60"><h3>61. Danke!</h3></div>
+  </div>
+</div>
+
+<script>
+(function(){
+  const slides = Array.from(document.querySelectorAll('.slide'));
+  const bar = document.getElementById('bar');
+  const counter = document.getElementById('counter');
+  const overview = document.getElementById('overview');
+  const help = document.getElementById('help');
+  const prevBtn = document.getElementById('prev');
+  const nextBtn = document.getElementById('next');
+  const gridBtn = document.getElementById('grid');
+  const helpBtn = document.getElementById('helpBtn');
+
+  let i = 0;
+  const total = slides.length;
+
+  function clamp(n, min, max) { return Math.max(min, Math.min(max, n)); }
+  function show(k, pushHash) {
+    if (pushHash === undefined) pushHash = true;
+    i = clamp(k, 0, total-1);
+    slides.forEach((s, idx)=> s.classList.toggle('active', idx===i));
+    const pct = ((i+1)/total)*100;
+    bar.style.width = pct + '%';
+    counter.textContent = (i+1) + '/' + total;
+    if(pushHash) location.hash = '#' + (i+1);
+    overview.classList.remove('show');
+  }
+
+  function fromHash(){
+    const n = parseInt(location.hash.replace('#',''), 10);
+    if(!isNaN(n) && n>=1 && n<=total) show(n-1, false); else show(0, false);
+  }
+
+  window.addEventListener('hashchange', fromHash);
+  fromHash();
+
+  function next(){ show(i+1); }
+  function prev(){ show(i-1); }
+
+  document.addEventListener('keydown', (e)=>{
+    if(e.key==='ArrowRight' || e.key==='PageDown' || e.key===' ' ) next();
+    if(e.key==='ArrowLeft'  || e.key==='PageUp'   || e.key==='Backspace') prev();
+    if(e.key==='o' || e.key==='O') overview.classList.toggle('show');
+    if(e.key==='h' || e.key==='H') help.classList.toggle('show');
+    if(e.key==='p' || e.key==='P') { 
+      if (document.fullscreenElement) document.exitFullscreen(); 
+      else document.documentElement.requestFullscreen();
+    }
+    if(e.key==='Home') show(0);
+    if(e.key==='End') show(total-1);
+  });
+
+  // Buttons
+  prevBtn.onclick = prev;
+  nextBtn.onclick = next;
+  gridBtn.onclick = ()=> overview.classList.toggle('show');
+  helpBtn.onclick = ()=> help.classList.toggle('show');
+
+  // Click overview
+  overview.addEventListener('click', (e)=>{
+    const t = e.target.closest('.thumb'); if(!t) return;
+    const go = parseInt(t.getAttribute('data-go'),10); show(go);
+  });
+
+  // Touch swipe
+  let startX = null;
+  document.addEventListener('touchstart', (e)=>{ startX = e.touches[0].clientX; }, {passive:true});
+  document.addEventListener('touchend', (e)=>{ 
+    if(startX===null) return; 
+    const dx = e.changedTouches[0].clientX - startX;
+    if(Math.abs(dx)>40) (dx<0? next:prev)();
+    startX = null;
+  }, {passive:true});
+
+  // Experimental: export current slide as PNG (S)
+  document.addEventListener('keydown', async (e)=>{
+    if(e.key!=='s' && e.key!=='S') return;
+    const active = slides[i];
+    try {
+      const serializer = new XMLSerializer();
+      const xml = serializer.serializeToString(active);
+      const svg = "<svg xmlns='http://www.w3.org/2000/svg' width='1600' height='900'><foreignObject width='100%' height='100%'>" + xml + "</foreignObject></svg>";
+      const blob = new Blob([svg], {type:'image/svg+xml;charset=utf-8'});
+      const url = URL.createObjectURL(blob);
+      const img = new Image(); img.onload = ()=>{
+        const c = document.createElement('canvas'); c.width=1600; c.height=900;
+        const ctx = c.getContext('2d'); ctx.fillStyle='#0b1220'; ctx.fillRect(0,0,c.width,c.height);
+        ctx.drawImage(img,0,0,1600,900);
+        URL.revokeObjectURL(url);
+        const a = document.createElement('a'); 
+        a.download = 'folie_' + String(i+1).padStart(2,'0') + '.png';
+        a.href = c.toDataURL('image/png');
+        a.click();
+      };
+      img.src = url;
+    } catch(err) { console.warn('PNG‑Export nicht unterstützt:', err); }
+  });
+})();
+</script>
+</body>
+</html>
